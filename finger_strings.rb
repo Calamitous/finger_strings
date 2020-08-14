@@ -5,11 +5,20 @@ require 'readline'
 require 'date'
 
 class Config
-  VERSION       = '0.0.1'
-  TODO_FILE     = "#{ENV['HOME']}/.finger_strings"
-  HISTORY_FILE  = "#{ENV['HOME']}/.finger_strings.history"
-  EMPTY_TODOS   = []
+  @@todo_file = "#{ENV['HOME']}/.finger_strings"
+
+  VERSION              = '0.0.2'
+  HISTORY_FILE         = "#{ENV['HOME']}/.finger_strings.history"
+  EMPTY_TODOS          = []
   FINGERSTRINGS_SCRIPT = __FILE__
+
+  def self.todo_file=(filepath)
+    @@todo_file = filepath
+  end
+
+  def self.todo_file
+    @@todo_file
+  end
 end
 
 class Display
@@ -35,7 +44,7 @@ class Hash
 end
 
 class Todo
-  attr_accessor :index, :category, :text, :completed_at, :available_on, :recurrence_rule #, :due_on, :tags
+  attr_accessor :index, :category, :text, :completed_at, :available_on, :recurrence_rule #, :due_on
 
   def initialize(data_hash)
     @text = data_hash['text']
@@ -47,31 +56,30 @@ class Todo
 
   def to_string
     display = "#{index}. #{text}"
-    # display += " {bi (Available on #{available_on})}" if available_on
     display += " {wi Recurs #{recurrence_rule} days after completion}" if recurrence_rule
     display
   end
 
   def self.load_todos
-    unless File.exists? Config::TODO_FILE
+    unless File.exists? Config.todo_file
       puts "TODO file not found, building..."
       File.umask(0122)
-      File.open(Config::TODO_FILE, 'w') { |f| f.write(Config::EMPTY_TODOS.to_json) }
+      File.open(Config.todo_file, 'w') { |f| f.write(Config::EMPTY_TODOS.to_json) }
     end
 
     begin
-      todos = JSON.parse(File.read(Config::TODO_FILE)).map(&:to_todo)
+      todos = JSON.parse(File.read(Config.todo_file)).map(&:to_todo)
       todos.map! { |todo| todo.available_on = Date.parse(todo.available_on) unless todo.available_on.nil?; todo }
       # todos.map! { |todo| todo.due_on = Date.parse(todo.due_on) unless todo.due_on.nil? }
       self.index_todos(todos)
     rescue JSON::ParserError => e
-      puts "Your read file appears to be corrupt.  Could not parse valid JSON from #{Config::TODO_FILE} Please fix or delete this read file."
+      puts "Your read file appears to be corrupt.  Could not parse valid JSON from #{Config.todo_file} Please fix or delete this read file."
       exit(1)
     end
   end
 
   def self.save_todos(todos)
-    File.write(Config::TODO_FILE, todos.map(&:to_hash).to_json)
+    File.write(Config.todo_file, todos.map(&:to_hash).to_json)
   end
 
   def self.index_todos(todos)
@@ -639,11 +647,16 @@ class StartUpper
         '',
         'Options',
         '========',
-        '--schedule-update: Updates all the todos based on the current date',
+        '--schedule-update:      Updates all the todos based on the current date',
+        '--todo-file <filepath>: Loads the specified todo file instead of the default ~/.finger_strings',
         '  NOTE: This should be run with the following crontab:',
         "  1 0 * * * #{Config::FINGERSTRINGS_SCRIPT} --schedule-update"
       )
       exit(0)
+    end
+
+    if ARGV.include?('--todo-file')
+      Config.todo_file = ARGV[ARGV.index('--todo-file') + 1]
     end
 
     if ARGV.include?('--schedule-update')
