@@ -35,19 +35,21 @@ class Hash
 end
 
 class Todo
-  attr_accessor :index, :category, :text, :completed_at, :available_on # , :recurrence_rule, :due_on, :tags
+  attr_accessor :index, :category, :text, :completed_at, :available_on, :recurrence_rule #, :due_on, :tags
 
   def initialize(data_hash)
     @text = data_hash['text']
     @category = data_hash['category'] || 'today'
     @completed_at = data_hash['completed_at']
     @available_on = data_hash['available_on']
+    @recurrence_rule = data_hash['recurrence_rule']
   end
 
   def to_string
-    return "#{index}. #{text} {bi (Available on #{available_on})}" if available_on
-
-    "#{index}. #{text}"
+    display = "#{index}. #{text}"
+    # display += " {bi (Available on #{available_on})}" if available_on
+    display += " {wi Recurs #{recurrence_rule} days after completion}" if recurrence_rule
+    display
   end
 
   def self.load_todos
@@ -80,6 +82,34 @@ class Todo
     todos
   end
 
+  def add_tag(new_tag)
+    new_tag = '|' + new_tag unless new_tag[0] == '|'
+
+    @text += " #{new_tag}"
+
+    todos = Todo.load_todos
+
+    location_index = todos.index { |todo| todo.index == self.index }
+    todos[location_index] = self
+
+    Todo.save_todos(todos)
+  end
+
+  def untag()
+    @text = text.split(' ').reject{ |word| word[0] == '|' }.join(' ')
+
+    todos = Todo.load_todos
+
+    location_index = todos.index { |todo| todo.index == self.index }
+    todos[location_index] = self
+
+    Todo.save_todos(todos)
+  end
+
+  def tags
+    text.split.select{ |word| word[0] == '|' }
+  end
+
   def self.today
     self.load_todos.select { |todo| todo.category == 'today' }
   end
@@ -89,7 +119,29 @@ class Todo
   end
 
   def self.upcoming
-    self.load_todos.select { |todo| todo.category == 'upcoming' }
+    self.load_todos.select { |todo| todo.category == 'upcoming' }.group_by(&:available_on)
+  end
+
+  def self.tagged
+    self.load_todos.select { |todo| todo.tags.any? }
+  end
+
+  def self.find_all_by_tag(tag)
+    self.tagged.select do |todo|
+      todo.tags.include?(tag)
+    end
+  end
+
+  def self.tag_hash
+    tag_hash = {}
+    self.all_tags.each do |tag|
+      tag_hash[tag] = find_all_by_tag(tag)
+    end
+    tag_hash
+  end
+
+  def self.all_tags
+    self.tagged.map(&:tags).flatten.uniq.sort
   end
 
   def self.by_category
@@ -97,7 +149,7 @@ class Todo
       'today' => [],
       'upcoming' => [],
       'someday' => [],
-      'repeaters' => [],
+      'recurring' => [],
       'done' => []
     }
 
@@ -120,12 +172,19 @@ class Todo
     hash = {'text' => text, 'category' => category}
     hash['completed_at'] = completed_at.to_s if completed_at
     hash['available_on'] = available_on.to_s if available_on
+    hash['recurrence_rule'] = recurrence_rule.to_s if recurrence_rule
     hash
   end
 
   def mark_done
-    @category = 'done'
     @completed_at = Time.now
+
+    unless recurrence_rule.nil?
+      next_date = Date.today + Integer(recurrence_rule)
+      return self.schedule(next_date)
+    end
+
+    @category = 'done'
 
     todos = Todo.load_todos
 
@@ -168,6 +227,15 @@ class Todo
     location_index = todos.index { |todo| todo.index == self.index }
     todos[location_index].available_on = date
     todos[location_index].category = 'upcoming'
+
+    Todo.save_todos(todos)
+  end
+
+  def recur(days)
+    todos = Todo.load_todos
+
+    location_index = todos.index { |todo| todo.index == self.index }
+    todos[location_index].recurrence_rule = days
 
     Todo.save_todos(todos)
   end
@@ -249,35 +317,40 @@ end
 
 class StartUpper
   CMD_MAP = {
-    'a'        => 'add',
-    'add'      => 'add',
-    'c'        => 'complete',
-    'complete' => 'complete',
-    'l'        => 'list',
-    'list'     => 'list',
-    'd'        => 'delete',
-    'delete'   => 'delete',
-    's'        => 'schedule',
-    'schedule' => 'schedule',
-    'p'        => 'priority',
-    'priority' => 'priority',
-    'h'        => 'help',
-    '?'        => 'help',
-    'help'     => 'help',
-    'q'        => 'quit',
-    'quit'     => 'quit',
-    'clear'    => 'clear',
-    'i'        => 'info',
-    'info  '   => 'info',
-    'cal'      => 'calendar',
-    'calendar' => 'calendar',
+    'a'          => 'add',
+    'add'        => 'add',
+    'c'          => 'complete',
+    'complete'   => 'complete',
+    'l'          => 'list',
+    'list'       => 'list',
+    'd'          => 'delete',
+    'delete'     => 'delete',
+    'p'          => 'priority',
+    'prioritize' => 'priority',
+    'r'          => 'recur',
+    'recur'      => 'recur',
+    's'          => 'schedule',
+    'schedule'   => 'schedule',
+    'h'          => 'help',
+    'tag'        => 'tag',
+    't'          => 'tag',
+    'untag'      => 'untag',
+    '?'          => 'help',
+    'help'       => 'help',
+    'q'          => 'quit',
+    'quit'       => 'quit',
+    'clear'      => 'clear',
+    'i'          => 'info',
+    'info  '     => 'info',
+    'cal'        => 'calendar',
+    'calendar'   => 'calendar',
   }
 
   CATEGORY_COLORS = {
-    'today' => '{w ',
+    'today' => '{wi ',
     'upcoming' => '{w ',
     'someday' => '{w ',
-    'repeaters' => '{w ',
+    'recurring' => '{w ',
     'done' => '{wv '
   }
 
@@ -313,11 +386,32 @@ class StartUpper
 
   def show_upcoming
     clear
-    show('upcoming', Todo.upcoming)
+    upcoming_hash = Todo.upcoming
+    upcoming_hash.keys.sort.each do |date|
+      Display.say("{bi #{date.to_s}}")
+      upcoming_hash[date].each do |todo|
+        Display.say("    #{todo.to_string}")
+      end
+    end
+  end
+
+  def show_tags
+    clear
+    tags_hash = Todo.tag_hash
+    tags_hash.keys.sort.each do |tag|
+      Display.say("{gi #{tag}}")
+      tags_hash[tag].each do |todo|
+        Display.say("    #{todo.to_string}")
+      end
+    end
   end
 
   def show(category, todos)
-    Display.say(CATEGORY_COLORS[category] + category.titleize + '}')
+    if category == 'today'
+      Display.say("#{CATEGORY_COLORS[category]} #{category.titleize} (#{Date.today.to_s}) }")
+    else
+      Display.say(CATEGORY_COLORS[category] + category.titleize + '}')
+    end
 
     if todos.size == 0
       Display.say('{r (none)}')
@@ -348,6 +442,7 @@ class StartUpper
     return show_all if args == ['all'] || args == ['*']
     return show_done if args == ['done'] || args == ['d']
     return show_upcoming if args == ['upcoming'] || args == ['u']
+    return show_tags if args == ['tags'] || args == ['t']
     show_today
   end
 
@@ -358,17 +453,11 @@ class StartUpper
   def complete(*args)
     args.flatten!
 
-    if args.size != 1
-      Display.say("I don't understand what you want to do")
-      return
-    end
+    return print_argument_error unless args.size == 1
 
     id = args[0]
 
-    unless todo = Todo.find(id)
-      Display.say("I couldn't find a todo with an ID of #{id}")
-      return
-    end
+    return print_lookup_error(id) unless todo = Todo.find(id)
 
     todo.mark_done
     list
@@ -377,17 +466,11 @@ class StartUpper
   def priority(*args)
     args.flatten!
 
-    if args.size != 1
-      Display.say("I don't understand what you want to do")
-      return
-    end
+    return print_argument_error unless args.size == 1
 
     id = args[0]
 
-    unless todo = Todo.find(id)
-      Display.say("I couldn't find a todo with an ID of #{id}")
-      return
-    end
+    return print_lookup_error(id) unless todo = Todo.find(id)
 
     todo.prioritize
     list
@@ -396,18 +479,12 @@ class StartUpper
   def schedule(args)
     args.flatten!
 
-    if args.size != 2
-      Display.say("I don't understand what you want to do")
-      return
-    end
+    return print_argument_error unless args.size == 2
 
     id = args[0]
     date = args[1]
 
-    unless todo = Todo.find(id)
-      Display.say("I couldn't find a todo with an ID of #{id}")
-      return
-    end
+    return print_lookup_error(id) unless todo = Todo.find(id)
 
     unless to_date = Date.parse(date)
       Display.say("I couldn't understand your date '#{date}' (should be YYYY-MM-dd)")
@@ -423,23 +500,78 @@ class StartUpper
     list
   end
 
+  def tag(args)
+    args.flatten!
+
+    return print_argument_error unless args.size == 2
+
+    id = args[0]
+    tag = args[1]
+
+    return print_lookup_error(id) unless todo = Todo.find(id)
+
+    todo.add_tag(tag)
+    list
+  end
+
+  def untag(args)
+    args.flatten!
+
+    return print_argument_error unless args.size == 1
+
+    id = args[0]
+    tag = args[1]
+
+    return print_lookup_error(id) unless todo = Todo.find(id)
+
+    todo.untag
+    list
+  end
+
+  def recur(args)
+    args.flatten!
+
+    return print_argument_error unless args.size == 2
+
+    id = args[0]
+    days = args[1]
+
+    return print_lookup_error(id) unless todo = Todo.find(id)
+
+    unless to_days = Integer(days)
+      Display.say("I couldn't understand your amount '#{amount}' (should be an integer)")
+      return
+    end
+
+    if to_days > 0
+      Display.say("Todo is set to recur #{to_days} after completion.")
+    else
+      Display.say("Recurrence has been disabled for this Todo")
+    end
+
+    todo.recur(to_days)
+    list
+  end
+
   def delete(args)
     args.flatten!
 
-    if args.size != 1
-      Display.say("I don't understand what you want to do")
-      return
-    end
+    return print_argument_error if args.size != 1
 
     id = args[0]
 
-    unless todo = Todo.find(id)
-      Display.say("I couldn't find a todo with an ID of #{id}")
-      return
-    end
+    return print_lookup_error(id) unless todo = Todo.find(id)
 
     todo.delete
     list
+  end
+
+  def print_argument_error
+    Display.say("I don't understand what you want to do")
+  end
+
+  def print_lookup_error(id)
+    Display.say("I couldn't find a todo with an ID of #{id}")
   end
 
   # TODO
@@ -459,17 +591,22 @@ class StartUpper
       '',
       'Commands',
       '========',
-      'add <text>, a <text> - Add a new Todo',
-      'list, l, l t         - List today\'s Todos',
-      'l *, l all           - List Todos in all categories',
-      'l u                  - List Upcoming Todos',
-      'l s                  - List Someday Todos',
-      'l r                  - List Repeater Todos',
-      'help, h, ?           - Display this text',
-      'complete, c          - Mark a Todo as done',
-      'delete, d            - Delete a Todo entirely',
-      'clear                - Clear screen',
-      'info, i              - Display Todoor version and stats',
+      'add <text>, a <text>          - Add a new Todo',
+      'list, l                       - List today\'s Todos',
+      '    l *, l all                - List Todos in all categories',
+      '    l u                       - List Upcoming Todos',
+      '    l r                       - List Recurring Todos',
+      '    l t                       - List Tags and tagged Todos',
+      'tag <id> <tag>, t <id> <tag>  - Add Tag to a Todo',
+      'untag <id>                    - Remove all Tags from a Todo',
+      'help, h, ?                    - Display this text',
+      'complete, c                   - Mark a Todo as done',
+      'prioritize, p                 - Move a Todo to the top of the list',
+      'delete, d                     - Delete a Todo entirely',
+      'schedule, s <id> <YYYY-MM-DD> - Schedule a Todo for a future date',
+      'recur, r <id> <amount>        - Set a recurrence rule for a Todo',
+      'clear                         - Clear screen',
+      'info, i                       - Display Todoor version and stats',
       '',
       'Full documentation available here:',
       'https://github.com/Calamitous/todoor/blob/master/README.md',
