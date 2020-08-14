@@ -6,10 +6,10 @@ require 'date'
 
 class Config
   VERSION       = '0.0.1'
-  TODO_FILE     = "#{ENV['HOME']}/.todoor"
-  HISTORY_FILE  = "#{ENV['HOME']}/.todoor.history"
+  TODO_FILE     = "#{ENV['HOME']}/.finger_strings"
+  HISTORY_FILE  = "#{ENV['HOME']}/.finger_strings.history"
   EMPTY_TODOS   = []
-  TODOOR_SCRIPT = __FILE__
+  FINGERSTRINGS_SCRIPT = __FILE__
 end
 
 class Display
@@ -439,10 +439,11 @@ class StartUpper
   def list(*args)
     args.flatten!
 
-    return show_all if args == ['all'] || args == ['*']
-    return show_done if args == ['done'] || args == ['d']
-    return show_upcoming if args == ['upcoming'] || args == ['u']
-    return show_tags if args == ['tags'] || args == ['t']
+    return show_all if args       == ['all']       || args == ['*']
+    return show_done if args      == ['done']      || args == ['d']
+    return show_upcoming if args  == ['upcoming']  || args == ['u']
+    return show_recurring if args == ['recurring'] || args == ['r']
+    return show_tags if args      == ['tags']      || args == ['t']
     show_today
   end
 
@@ -580,36 +581,36 @@ class StartUpper
 
   def info(*_args)
     stats = Todo.by_category.map { |category, todos| "#{todos.size} Todos in #{category}" }
-    stats.unshift "ToDoor v#{Config::VERSION}"
+    stats.unshift "FingerStrings v#{Config::VERSION}"
 
     Display.flowerbox(*stats, box_thickness: 0)
   end
 
   def help(*_args)
     Display.flowerbox(
-      "ToDoor v#{Config::VERSION}",
+      "FingerStrings v#{Config::VERSION}",
       '',
-      'Commands',
+      'Commands (the starting letter can be used if underlined)',
       '========',
-      'add <text>, a <text>          - Add a new Todo',
-      'list, l                       - List today\'s Todos',
-      '    l *, l all                - List Todos in all categories',
-      '    l u                       - List Upcoming Todos',
-      '    l r                       - List Recurring Todos',
-      '    l t                       - List Tags and tagged Todos',
-      'tag <id> <tag>, t <id> <tag>  - Add Tag to a Todo',
-      'untag <id>                    - Remove all Tags from a Todo',
-      'help, h, ?                    - Display this text',
-      'complete, c                   - Mark a Todo as done',
-      'prioritize, p                 - Move a Todo to the top of the list',
-      'delete, d                     - Delete a Todo entirely',
-      'schedule, s <id> <YYYY-MM-DD> - Schedule a Todo for a future date',
-      'recur, r <id> <amount>        - Set a recurrence rule for a Todo',
-      'clear                         - Clear screen',
-      'info, i                       - Display Todoor version and stats',
+      '{wu a}dd <text>                 - Add a new Todo',
+      '{wu l}ist                       - List today\'s Todos',
+      '    l *, l all                  - List Todos in all categories',
+      '    l {wu u}pcoming             - List Upcoming Todos',
+      '    l {wu r}ecurring            - List Recurring Todos',
+      '    l {wu t}ags                 - List Tags and tagged Todos',
+      '{wu c}omplete                   - Mark a Todo as done',
+      '{wu p}rioritize                 - Move a Todo to the top of the list',
+      '{w t}ag <id> <tag>              - Add Tag to a Todo',
+      '{wu s}chedule <id> <YYYY-MM-DD> - Schedule a Todo for a future date',
+      '{wu r}ecur <id> <amount>        - Set a recurrence rule for a Todo',
+      'untag <id>                      - Remove all Tags from a Todo',
+      '{wu d}elete                     - Delete a Todo entirely',
+      '{wu i}nfo                       - Display FingerStrings version and stats',
+      '{wu h}elp, ?                    - Display this text',
+      'clear                           - Clear screen',
       '',
       'Full documentation available here:',
-      'https://github.com/Calamitous/todoor/blob/master/README.md',
+      'https://github.com/Calamitous/finger_strings/blob/master/README.md',
       box_character: '')
   end
 
@@ -634,13 +635,13 @@ class StartUpper
   def initialize
     if ARGV.include?('--help')
       Display.flowerbox(
-        "ToDoor v#{Config::VERSION}",
+        "FingerStrings v#{Config::VERSION}",
         '',
         'Options',
         '========',
         '--schedule-update: Updates all the todos based on the current date',
         '  NOTE: This should be run with the following crontab:',
-        "  1 0 * * * #{Config::TODOOR_SCRIPT} --schedule-update"
+        "  1 0 * * * #{Config::FINGERSTRINGS_SCRIPT} --schedule-update"
       )
       exit(0)
     end
@@ -650,7 +651,7 @@ class StartUpper
       exit(0)
     end
 
-    Display.say "Welcome to ToDoor v#{Config::VERSION}.  Type 'help' for a list of commands; Ctrl-D or 'quit' to leave."
+    Display.say "Welcome to FingerStrings v#{Config::VERSION}.  Type 'help' for a list of commands; Ctrl-D or 'quit' to leave."
     show_today
 
     while line = readline("~> ") do
