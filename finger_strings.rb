@@ -259,6 +259,20 @@ class Todo
   end
 end
 
+class Date
+  def tomorrow?
+    self == Date.today.next
+  end
+
+  def this_week?
+    self < Date.today + 7
+  end
+
+  def next_week?
+    self >= Date.today + 7 && self < Date.today + 14
+  end
+end
+
 class String
   COLOR_MAP = {
     'n' => '0',
@@ -396,10 +410,13 @@ class StartUpper
     clear
     upcoming_hash = Todo.upcoming
     upcoming_hash.keys.sort.each do |date|
-      Display.say("{bi #{date.to_s}}")
-      upcoming_hash[date].each do |todo|
-        Display.say("    #{todo.to_string}")
-      end
+      follower = "(#{date.strftime('%A')})" if date.this_week?
+      follower = "(Next #{date.strftime('%A')})" if date.next_week?
+      follower = '(Tomorrow)' if date.tomorrow?
+
+      Display.say("{bi #{date.to_s}} {wi #{follower}}")
+
+      upcoming_hash[date].each { |todo| Display.say("    #{todo.to_string}") }
     end
   end
 
