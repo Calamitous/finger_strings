@@ -649,6 +649,7 @@ class StartUpper
         '========',
         '--schedule-update:      Updates all the todos based on the current date',
         '--todo-file <filepath>: Loads the specified todo file instead of the default ~/.finger_strings',
+        '',
         '  NOTE: This should be run with the following crontab:',
         "  1 0 * * * #{Config::FINGERSTRINGS_SCRIPT} --schedule-update"
       )
