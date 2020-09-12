@@ -3,6 +3,7 @@
 require 'json'
 require 'readline'
 require 'date'
+# require 'pry-nav'; binding.pry
 
 class Config
   @@todo_file = "#{ENV['HOME']}/.finger_strings"
@@ -126,12 +127,16 @@ class Todo
     self.load_todos.select { |todo| todo.category == 'done' }
   end
 
+  def self.not_done
+    self.load_todos.select { |todo| todo.category != 'done' }
+  end
+
   def self.upcoming
     self.load_todos.select { |todo| todo.category == 'upcoming' }.group_by(&:available_on)
   end
 
   def self.tagged
-    self.load_todos.select { |todo| todo.tags.any? }
+    self.not_done.select { |todo| todo.tags.any? }
   end
 
   def self.find_all_by_tag(tag)

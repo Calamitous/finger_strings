@@ -15,3 +15,7 @@ FingerStrings is strictly text-based, requiring no GUI or web servers.
  * [License](#license)
 
 
+Crontab:
+```
+1 0 * * * ~/Projects/finger_strings/finger_strings.rb --schedule-update
+```
