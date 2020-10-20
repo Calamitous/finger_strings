@@ -489,7 +489,7 @@ class StartUpper
 
     Todo.by_category.each do |category, todos|
       Display.say
-      show(category, todos)
+      StartUpper.show(category, todos)
     end
   end
 
@@ -507,6 +507,10 @@ class StartUpper
     return show_recurring if args == ['recurring'] || args == ['r']
     return show_tags if args      == ['tags']      || args == ['t']
     StartUpper.show_today
+  end
+
+  def clear(*_args)
+    Display.clear
   end
 
   def self.clear(*_args)
