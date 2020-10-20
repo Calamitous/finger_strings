@@ -8,7 +8,7 @@ require 'date'
 class Config
   @@todo_file = "#{ENV['HOME']}/.finger_strings"
 
-  VERSION              = '0.0.2'
+  VERSION              = '0.0.3'
   HISTORY_FILE         = "#{ENV['HOME']}/.finger_strings.history"
   EMPTY_TODOS          = []
   FINGERSTRINGS_SCRIPT = __FILE__
@@ -23,18 +23,43 @@ class Config
 end
 
 class Display
+  @@markers = []
   MIN_WIDTH = 80
-  WIDTH = [ENV['COLUMNS'].to_i, `tput cols`.chomp.to_i, MIN_WIDTH].compact.max
 
   def self.say(*stuff)
     stuff = stuff.join(' ') if stuff.is_a? Array
     puts stuff.colorize
   end
 
+  def self.mark
+    mark = '-' * width
+    self.say(mark)
+  end
+
+  def self.size_changed
+    StartUpper.show_today
+  end
+
+  def self.clear
+    say `tput reset`.chomp
+  end
+
+  def self.width
+    [ENV['COLUMNS'].to_i, `tput cols`.chomp.to_i, MIN_WIDTH].compact.max
+  end
+
   def self.flowerbox(*lines, box_character: '*', box_thickness: 1)
-    box_thickness.times do say box_character * WIDTH end
+    box_thickness.times do say box_character * width end
     lines.each { |line| say line }
-    box_thickness.times do say box_character * WIDTH end
+    box_thickness.times do say box_character * width end
+  end
+
+  def self.add_marker(index)
+    @@markers << index.to_s
+  end
+
+  def self.markers
+    @@markers
   end
 end
 
@@ -104,7 +129,7 @@ class Todo
     Todo.save_todos(todos)
   end
 
-  def untag()
+  def untag
     @text = text.split(' ').reject{ |word| word[0] == '|' }.join(' ')
 
     todos = Todo.load_todos
@@ -216,6 +241,23 @@ class Todo
     Todo.save_todos(todos)
   end
 
+  def deprioritize
+    todos = Todo.load_todos
+
+    location_index = todos.index { |todo| todo.index == self.index }
+    todos.delete_at(location_index)
+    todos.push(self)
+
+    Todo.save_todos(todos)
+  end
+
+  def mark
+    todos = Todo.load_todos
+
+    location_index = todos.index { |todo| todo.index == self.index }
+    Display.add_marker location_index
+  end
+
   def prioritize
     todos = Todo.load_todos
 
@@ -270,11 +312,11 @@ class Date
   end
 
   def this_week?
-    self < Date.today + 7
+    self < Date.today + 6
   end
 
   def next_week?
-    self >= Date.today + 7 && self < Date.today + 14
+    self >= Date.today + 6 && self < Date.today + 14
   end
 end
 
@@ -344,33 +386,37 @@ end
 
 class StartUpper
   CMD_MAP = {
-    'a'          => 'add',
-    'add'        => 'add',
-    'c'          => 'complete',
-    'complete'   => 'complete',
-    'l'          => 'list',
-    'list'       => 'list',
-    'd'          => 'delete',
-    'delete'     => 'delete',
-    'p'          => 'priority',
-    'prioritize' => 'priority',
-    'r'          => 'recur',
-    'recur'      => 'recur',
-    's'          => 'schedule',
-    'schedule'   => 'schedule',
-    'h'          => 'help',
-    'tag'        => 'tag',
-    't'          => 'tag',
-    'untag'      => 'untag',
-    '?'          => 'help',
-    'help'       => 'help',
-    'q'          => 'quit',
-    'quit'       => 'quit',
-    'clear'      => 'clear',
-    'i'          => 'info',
-    'info  '     => 'info',
-    'cal'        => 'calendar',
-    'calendar'   => 'calendar',
+    'a'            => 'add',
+    'add'          => 'add',
+    'c'            => 'complete',
+    'complete'     => 'complete',
+    'l'            => 'list',
+    'list'         => 'list',
+    'd'            => 'delete',
+    'delete'       => 'delete',
+    'p'            => 'prioritize',
+    'prioritize'   => 'prioritize',
+    '!'            => 'deprioritize',
+    'deprioritize' => 'deprioritize',
+    'r'            => 'recur',
+    'recur'        => 'recur',
+    's'            => 'schedule',
+    'schedule'     => 'schedule',
+    'h'            => 'help',
+    'tag'          => 'tag',
+    't'            => 'tag',
+    'untag'        => 'untag',
+    '?'            => 'help',
+    'help'         => 'help',
+    'q'            => 'quit',
+    'quit'         => 'quit',
+    'clear'        => 'clear',
+    'i'            => 'info',
+    'info  '       => 'info',
+    'cal'          => 'calendar',
+    'calendar'     => 'calendar',
+    'm'            => 'mark',
+    'mark'         => 'mark',
   }
 
   CATEGORY_COLORS = {
@@ -401,18 +447,18 @@ class StartUpper
     exit(0)
   end
 
-  def show_today()
-    clear
+  def self.show_today
+    Display.clear
     show('today', Todo.today)
   end
 
-  def show_done()
-    clear
+  def show_done
+    Display.clear
     show('done', Todo.done)
   end
 
   def show_upcoming
-    clear
+    Display.clear
     upcoming_hash = Todo.upcoming
     upcoming_hash.keys.sort.each do |date|
       follower = "(#{date.strftime('%A')})" if date.this_week?
@@ -426,7 +472,7 @@ class StartUpper
   end
 
   def show_tags
-    clear
+    Display.clear
     tags_hash = Todo.tag_hash
     tags_hash.keys.sort.each do |tag|
       Display.say("{gi #{tag}}")
@@ -436,7 +482,7 @@ class StartUpper
     end
   end
 
-  def show(category, todos)
+  def self.show(category, todos)
     if category == 'today'
       Display.say("#{CATEGORY_COLORS[category]} #{category.titleize} (#{Date.today.to_s}) }")
     else
@@ -448,15 +494,16 @@ class StartUpper
     else
       todos.each do |todo|
         Display.say(todo.to_string)
+        Display.mark if Display.markers.include?(todo.index)
       end
     end
   end
 
-  def show_all()
-    clear
+  def show_all
+    Display.clear
 
     Todo.by_category.each do |category, todos|
-      Display.say()
+      Display.say
       show(category, todos)
     end
   end
@@ -474,11 +521,11 @@ class StartUpper
     return show_upcoming if args  == ['upcoming']  || args == ['u']
     return show_recurring if args == ['recurring'] || args == ['r']
     return show_tags if args      == ['tags']      || args == ['t']
-    show_today
+    StartUpper.show_today
   end
 
-  def clear(*_args)
-    Display.say `tput reset`.chomp
+  def self.clear(*_args)
+    Display.clear
   end
 
   def complete(*args)
@@ -494,7 +541,20 @@ class StartUpper
     list
   end
 
-  def priority(*args)
+  def deprioritize(*args)
+    args.flatten!
+
+    return print_argument_error unless args.size == 1
+
+    id = args[0]
+
+    return print_lookup_error(id) unless todo = Todo.find(id)
+
+    todo.deprioritize
+    list
+  end
+
+  def prioritize(*args)
     args.flatten!
 
     return print_argument_error unless args.size == 1
@@ -504,6 +564,19 @@ class StartUpper
     return print_lookup_error(id) unless todo = Todo.find(id)
 
     todo.prioritize
+    list
+  end
+
+  def mark(*args)
+    args.flatten!
+
+    return print_argument_error unless args.size == 1
+
+    id = args[0]
+
+    return print_lookup_error(id) unless todo = Todo.find(id)
+
+    todo.mark
     list
   end
 
@@ -628,8 +701,9 @@ class StartUpper
       '    l {wu u}pcoming             - List Upcoming Todos',
       '    l {wu r}ecurring            - List Recurring Todos',
       '    l {wu t}ags                 - List Tags and tagged Todos',
-      '{wu c}omplete                   - Mark a Todo as done',
-      '{wu p}rioritize                 - Move a Todo to the top of the list',
+      '{wu c}omplete <id>              - Mark a Todo as done',
+      '{wu p}rioritize <id>            - Move a Todo to the top of the list',
+      '!, deprioritize <id>            - Move a Todo to the bottom of the list',
       '{w t}ag <id> <tag>              - Add Tag to a Todo',
       '{wu s}chedule <id> <YYYY-MM-DD> - Schedule a Todo for a future date',
       '{wu r}ecur <id> <amount>        - Set a recurrence rule for a Todo',
@@ -687,8 +761,10 @@ class StartUpper
       exit(0)
     end
 
+    Signal.trap('SIGWINCH', :'Display.size_changed')
+
     Display.say "Welcome to FingerStrings v#{Config::VERSION}.  Type 'help' for a list of commands; Ctrl-D or 'quit' to leave."
-    show_today
+    StartUpper.show_today
 
     while line = readline("~> ") do
       handle(line)

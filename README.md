@@ -5,8 +5,8 @@ FingerStrings is a tiny script that is a sort-of todo list, with recurrence and 
 
 FingerStrings is strictly text-based, requiring no GUI or web servers.
 
- * [Installation](#installation)
  * [Usage](#usage)
+ * [Installation](#installation)
  * [Commands](#commands)
  * [Command-line Options](#command-line-options)
  * [Philosophy](#philosophy)
