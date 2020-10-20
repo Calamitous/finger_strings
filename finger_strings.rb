@@ -364,21 +364,6 @@ class String
     newstr.colorize.color_bounded
   end
 
-  def decolorize
-    self.
-      gsub(/\\{/, '|KOPEN|').
-      gsub(/\\}/, '|KCLOSE|').
-      gsub(/{[rgybmcwniuv]+\s|}/, '').
-      gsub(/\|KOPEN\|/, '{').
-      gsub(/\|KCLOSE\|/, '}')
-  end
-
-  def wrapped(width = Display::WIDTH)
-    self.gsub(/.{1,#{width}}(?:\s|\Z|\-)/) {
-      ($& + 5.chr).gsub(/\n\005/,"\n").gsub(/\005/,"\n")
-    }
-  end
-
   def color_bounded
     COLOR_RESET + self.gsub(/\n/, "\n#{COLOR_RESET}") + COLOR_RESET
   end
@@ -528,56 +513,40 @@ class StartUpper
     Display.clear
   end
 
-  def complete(*args)
+  def single_todo_command(*args)
     args.flatten!
 
     return print_argument_error unless args.size == 1
 
-    id = args[0]
+    return print_lookup_error(id) unless todo = Todo.find(args[0])
 
-    return print_lookup_error(id) unless todo = Todo.find(id)
+    yield todo
 
-    todo.mark_done
     list
+  end
+
+  def complete(*args)
+    single_todo_command(args) { |todo| todo.mark_done }
   end
 
   def deprioritize(*args)
-    args.flatten!
-
-    return print_argument_error unless args.size == 1
-
-    id = args[0]
-
-    return print_lookup_error(id) unless todo = Todo.find(id)
-
-    todo.deprioritize
-    list
+    single_todo_command(args) { |todo| todo.deprioritize }
   end
 
   def prioritize(*args)
-    args.flatten!
-
-    return print_argument_error unless args.size == 1
-
-    id = args[0]
-
-    return print_lookup_error(id) unless todo = Todo.find(id)
-
-    todo.prioritize
-    list
+    single_todo_command(args) { |todo| todo.prioritize }
   end
 
   def mark(*args)
-    args.flatten!
+    single_todo_command(args) { |todo| todo.mark }
+  end
 
-    return print_argument_error unless args.size == 1
+  def untag(args)
+    single_todo_command(args) { |todo| todo.untag }
+  end
 
-    id = args[0]
-
-    return print_lookup_error(id) unless todo = Todo.find(id)
-
-    todo.mark
-    list
+  def delete(args)
+    single_todo_command(args) { |todo| todo.delete }
   end
 
   def schedule(args)
@@ -618,20 +587,6 @@ class StartUpper
     list
   end
 
-  def untag(args)
-    args.flatten!
-
-    return print_argument_error unless args.size == 1
-
-    id = args[0]
-    tag = args[1]
-
-    return print_lookup_error(id) unless todo = Todo.find(id)
-
-    todo.untag
-    list
-  end
-
   def recur(args)
     args.flatten!
 
@@ -654,19 +609,6 @@ class StartUpper
     end
 
     todo.recur(to_days)
-    list
-  end
-
-  def delete(args)
-    args.flatten!
-
-    return print_argument_error if args.size != 1
-
-    id = args[0]
-
-    return print_lookup_error(id) unless todo = Todo.find(id)
-
-    todo.delete
     list
   end
 
