@@ -23,8 +23,15 @@ class Config
 end
 
 class Display
-  @@markers = []
+  @@marker = nil
   MIN_WIDTH = 80
+
+  def self.line_say(*stuff)
+    stuff = stuff.join(' ') if stuff.is_a? Array
+    stuff = stuff.gsub(/(\|.*)$/, '{ig \1}')
+    stuff = stuff.gsub(/(\|.*)\W/, '{ig \1}')
+    puts stuff.colorize
+  end
 
   def self.say(*stuff)
     stuff = stuff.join(' ') if stuff.is_a? Array
@@ -55,11 +62,11 @@ class Display
   end
 
   def self.add_marker(index)
-    @@markers << index.to_s
+    @@marker = index
   end
 
-  def self.markers
-    @@markers
+  def self.marker
+    @@marker
   end
 end
 
@@ -248,6 +255,10 @@ class Todo
     todos.delete_at(location_index)
     todos.push(self)
 
+    if Display.marker && location_index < Display.marker
+      Display.add_marker(Display.marker - 1)
+    end
+
     Todo.save_todos(todos)
   end
 
@@ -264,6 +275,10 @@ class Todo
     location_index = todos.index { |todo| todo.index == self.index }
     todos.delete_at(location_index)
     todos.unshift(self)
+
+    if Display.marker && location_index > Display.marker
+      Display.add_marker(Display.marker + 1)
+    end
 
     Todo.save_todos(todos)
   end
@@ -477,9 +492,9 @@ class StartUpper
     if todos.size == 0
       Display.say('{r (none)}')
     else
-      todos.each do |todo|
-        Display.say(todo.to_string)
-        Display.mark if Display.markers.include?(todo.index)
+      todos.each_with_index do |todo, raw_idx|
+        Display.line_say(todo.to_string)
+        Display.mark if Display.marker == raw_idx
       end
     end
   end
@@ -583,7 +598,7 @@ class StartUpper
     return print_argument_error unless args.size == 2
 
     id = args[0]
-    tag = args[1]
+    tag = args[1].downcase
 
     return print_lookup_error(id) unless todo = Todo.find(id)
 
@@ -653,6 +668,7 @@ class StartUpper
       '{w t}ag <id> <tag>              - Add Tag to a Todo',
       '{wu s}chedule <id> <YYYY-MM-DD> - Schedule a Todo for a future date',
       '{wu r}ecur <id> <amount>        - Set a recurrence rule for a Todo',
+      '{wu m}ark <id>                  - Add a marker below the specified todo (impermanent)',
       'untag <id>                      - Remove all Tags from a Todo',
       '{wu d}elete                     - Delete a Todo entirely',
       '{wu i}nfo                       - Display FingerStrings version and stats',
