@@ -263,7 +263,7 @@ class Todo
   end
 
   def mark
-    todos = Todo.load_todos
+    todos = Todo.today
 
     location_index = todos.index { |todo| todo.index == self.index }
     Display.add_marker location_index
