@@ -428,7 +428,7 @@ class StartUpper
   }
 
   def handle(line)
-    tokens = line.split(/\s/)
+    tokens = line.split(/\s+/)
     cmd = tokens.first
     if !CMD_MAP.include?(cmd)
       Display.say 'I didn\'t understand your command.  Type "help" for a list of valid commands.'
@@ -568,23 +568,57 @@ class StartUpper
     single_todo_command(args) { |todo| todo.delete }
   end
 
+  def days_to_date(date_request)
+    return nil unless date_request =~ /^\d+\s*days?$/
+    days = date_request.split(/\s/).first.to_i
+    Date.today + days
+  end
+
+  def dow_to_date(date_request)
+    dows = %w{sun mon tue wed thu fri sat}
+
+    request_day = date_request.split(/\s+/).last
+    request_dow = dows.index(request_day)
+
+    return nil unless request_dow
+
+    today_dow = Date.today.wday
+
+    next_date = Date.today + ((request_dow + today_dow + 1) % 7)
+
+    next_date += 7 if next_date <= Date.today
+    next_date += 7 if date_request.split(/\s+/).first.downcase == 'next'
+    next_date
+  end
+
+  def parse_date(date_request)
+    begin
+      return Date.parse(date_request)
+    rescue
+    end
+
+    nil
+  end
+
   def schedule(args)
     args.flatten!
 
-    return print_argument_error unless args.size == 2
+    return print_argument_error unless [2, 3].include? args.size
 
     id = args[0]
-    date = args[1]
+    date_request = args[1..-1].join(' ')
 
     return print_lookup_error(id) unless todo = Todo.find(id)
 
-    unless to_date = Date.parse(date)
-      Display.say("I couldn't understand your date '#{date}' (should be YYYY-MM-dd)")
+    to_date = dow_to_date(date_request) || days_to_date(date_request) || parse_date(date_request)
+
+    unless to_date
+      Display.say("I couldn't understand your date '#{date_request}' (should be YYYY-MM-dd)")
       return
     end
 
     unless to_date > Date.today
-      Display.say("Schedules Todos should happen in the future.  #{date} is not in the future.")
+      Display.say("Schedules Todos should happen in the future.  #{to_date} is not in the future.")
       return
     end
 
