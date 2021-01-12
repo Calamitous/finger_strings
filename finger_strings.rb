@@ -90,6 +90,7 @@ class Todo
   def to_string
     display = "#{index}. #{text}"
     display += " {wi Recurs #{recurrence_rule} days after completion}" if recurrence_rule
+    display += " {c Completed #{DateTime.parse(completed_at).strftime('%Y-%m-%d')}}" if category == 'done'
     display
   end
 
@@ -156,7 +157,7 @@ class Todo
   end
 
   def self.done
-    self.load_todos.select { |todo| todo.category == 'done' }
+    self.load_todos.select { |todo| todo.category == 'done' }.sort { |left, right| right.completed_at <=> left.completed_at }
   end
 
   def self.not_done
@@ -452,7 +453,7 @@ class StartUpper
     show('today', Todo.today)
   end
 
-  def show_done
+  def self.show_done
     Display.clear
     show('done', Todo.done)
   end
@@ -516,11 +517,11 @@ class StartUpper
   def list(*args)
     args.flatten!
 
-    return show_all if args       == ['all']       || args == ['*']
-    return show_done if args      == ['done']      || args == ['d']
-    return show_upcoming if args  == ['upcoming']  || args == ['u']
-    return show_recurring if args == ['recurring'] || args == ['r']
-    return show_tags if args      == ['tags']      || args == ['t']
+    return show_all if args             == ['all']       || args == ['*']
+    return StartUpper.show_done if args == ['done']      || args == ['d']
+    return show_upcoming if args        == ['upcoming']  || args == ['u']
+    return show_recurring if args       == ['recurring'] || args == ['r']
+    return show_tags if args            == ['tags']      || args == ['t']
     StartUpper.show_today
   end
 
