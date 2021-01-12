@@ -588,7 +588,7 @@ class StartUpper
     next_date = Date.today + ((request_dow + today_dow + 1) % 7)
 
     next_date += 7 if next_date <= Date.today
-    next_date += 7 if date_request.split(/\s+/).first.downcase == 'next'
+    next_date += 7 if %w{next n}.include? date_request.split(/\s+/).first.downcase
     next_date
   end
 
@@ -598,6 +598,11 @@ class StartUpper
     rescue
     end
 
+    nil
+  end
+
+  def specials_to_date(date_request)
+    return Date.today + 1 if date_request.downcase == 'tomorrow'
     nil
   end
 
@@ -611,7 +616,7 @@ class StartUpper
 
     return print_lookup_error(id) unless todo = Todo.find(id)
 
-    to_date = dow_to_date(date_request) || days_to_date(date_request) || parse_date(date_request)
+    to_date = specials_to_date(date_request) || dow_to_date(date_request) || days_to_date(date_request) || parse_date(date_request)
 
     unless to_date
       Display.say("I couldn't understand your date '#{date_request}' (should be YYYY-MM-dd)")
