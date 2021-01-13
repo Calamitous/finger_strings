@@ -585,10 +585,15 @@ class StartUpper
 
     today_dow = Date.today.wday
 
-    next_date = Date.today + ((request_dow + today_dow + 1) % 7)
+    date_gap = request_dow - today_dow
+    date_gap += 6 if date_gap < 0
+    next_date = Date.today + date_gap
 
     next_date += 7 if next_date <= Date.today
+
+    # Allow "next" or "n" to be used to push a date out a week
     next_date += 7 if %w{next n}.include? date_request.split(/\s+/).first.downcase
+
     next_date
   end
 
