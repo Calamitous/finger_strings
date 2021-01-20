@@ -235,6 +235,11 @@ class Todo
     todos = Todo.load_todos
 
     location_index = todos.index { |todo| todo.index == self.index }
+
+    if Display.marker && location_index <= (Display.marker + 1)
+      Display.add_marker(Display.marker - 1)
+    end
+
     todos[location_index] = self
 
     Todo.save_todos(todos)
@@ -256,7 +261,7 @@ class Todo
     todos.delete_at(location_index)
     todos.push(self)
 
-    if Display.marker && location_index < Display.marker
+    if Display.marker && location_index <= (Display.marker + 1)
       Display.add_marker(Display.marker - 1)
     end
 
@@ -277,7 +282,7 @@ class Todo
     todos.delete_at(location_index)
     todos.unshift(self)
 
-    if Display.marker && location_index > Display.marker
+    if Display.marker && location_index <= (Display.marker + 1)
       Display.add_marker(Display.marker + 1)
     end
 
