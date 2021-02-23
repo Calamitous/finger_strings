@@ -282,7 +282,7 @@ class Todo
     todos.delete_at(location_index)
     todos.unshift(self)
 
-    if Display.marker && location_index <= (Display.marker + 1)
+    if Display.marker && location_index > (Display.marker + 1)
       Display.add_marker(Display.marker + 1)
     end
 
@@ -467,9 +467,9 @@ class StartUpper
     Display.clear
     upcoming_hash = Todo.upcoming
     upcoming_hash.keys.sort.each do |date|
-      follower = "(#{date.strftime('%A')})" if date.this_week?
-      follower = "(Next #{date.strftime('%A')})" if date.next_week?
-      follower = '(Tomorrow)' if date.tomorrow?
+      follower = "[#{date.strftime('%A')}]" if date.this_week?
+      follower = "[Next #{date.strftime('%A')}]" if date.next_week?
+      follower = '[Tomorrow]' if date.tomorrow?
 
       Display.say("{bi #{date.to_s}} {wi #{follower}}")
 
@@ -490,7 +490,7 @@ class StartUpper
 
   def self.show(category, todos)
     if category == 'today'
-      Display.say("#{CATEGORY_COLORS[category]} #{category.titleize} (#{Date.today.to_s}) }")
+      Display.say("#{CATEGORY_COLORS[category]} Today (#{todos.size} items) [#{Date.today.to_s}] }")
     else
       Display.say(CATEGORY_COLORS[category] + category.titleize + '}')
     end
@@ -591,7 +591,7 @@ class StartUpper
     today_dow = Date.today.wday
 
     date_gap = request_dow - today_dow
-    date_gap += 6 if date_gap < 0
+    date_gap += 7 if date_gap <= 0
     next_date = Date.today + date_gap
 
     next_date += 7 if next_date <= Date.today
