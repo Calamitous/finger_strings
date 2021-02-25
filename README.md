@@ -19,3 +19,9 @@ Crontab:
 ```
 1 0 * * * ~/Projects/finger_strings/finger_strings.rb --schedule-update
 ```
+
+# Tests
+
+`gem install --user-install minitest`
+`gem install --user-install mocha`
+

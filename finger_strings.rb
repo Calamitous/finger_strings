@@ -3,10 +3,13 @@
 require 'json'
 require 'readline'
 require 'date'
+
+# Only for debugging
 # require 'pry-nav'; binding.pry
 
 class Config
-  @@todo_file = "#{ENV['HOME']}/.finger_strings"
+
+  @@todo_file = $test_todo_file || "#{ENV['HOME']}/.finger_strings"
 
   VERSION              = '0.0.3'
   HISTORY_FILE         = "#{ENV['HOME']}/.finger_strings.history"
@@ -434,7 +437,7 @@ class StartUpper
   }
 
   def handle(line)
-    tokens = line.split(/\s+/)
+    tokens = line.strip.split(/\s+/)
     cmd = tokens.first
     if !CMD_MAP.include?(cmd)
       Display.say 'I didn\'t understand your command.  Type "help" for a list of valid commands.'
@@ -784,4 +787,4 @@ class StartUpper
   end
 end
 
-StartUpper.new
+StartUpper.new if __FILE__==$0
