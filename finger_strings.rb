@@ -237,13 +237,9 @@ class Todo
 
     todos = Todo.load_todos
 
-    location_index = todos.index { |todo| todo.index == self.index }
+    original_todo_index = todos.map(&:index).index(self.index.to_s)
 
-    if Display.marker && location_index <= (Display.marker + 1)
-      Display.add_marker(Display.marker - 1)
-    end
-
-    todos[location_index] = self
+    todos[original_todo_index] = self
 
     Todo.save_todos(todos)
   end
@@ -251,8 +247,13 @@ class Todo
   def delete
     todos = Todo.load_todos
 
-    location_index = todos.index { |todo| todo.index == self.index }
-    todos.delete_at(location_index)
+    original_todo_index = todos.map(&:index).index(self.index.to_s)
+
+    todos.delete_at(original_todo_index)
+
+    if Display.marker && original_todo_index <= (Display.marker + 1)
+      Display.add_marker(Display.marker - 1)
+    end
 
     Todo.save_todos(todos)
   end
@@ -260,11 +261,12 @@ class Todo
   def deprioritize
     todos = Todo.load_todos
 
-    location_index = todos.index { |todo| todo.index == self.index }
-    todos.delete_at(location_index)
+    original_todo_index = todos.map(&:index).index(self.index.to_s)
+
+    todos.delete_at(original_todo_index)
     todos.push(self)
 
-    if Display.marker && location_index <= (Display.marker + 1)
+    if Display.marker && original_todo_index <= (Display.marker + 1)
       Display.add_marker(Display.marker - 1)
     end
 
@@ -274,18 +276,19 @@ class Todo
   def mark
     todos = Todo.today
 
-    location_index = todos.index { |todo| todo.index == self.index }
-    Display.add_marker location_index
+    original_todo_index = todos.map(&:index).index(self.index.to_s)
+
+    Display.add_marker original_todo_index
   end
 
   def prioritize
     todos = Todo.load_todos
 
-    location_index = todos.index { |todo| todo.index == self.index }
-    todos.delete_at(location_index)
+    original_todo_index = todos.map(&:index).index(self.index.to_s)
+    todos.delete_at(original_todo_index)
     todos.unshift(self)
 
-    if Display.marker && location_index > (Display.marker + 1)
+    if Display.marker && (original_todo_index > Display.marker)
       Display.add_marker(Display.marker + 1)
     end
 
@@ -303,9 +306,10 @@ class Todo
   def schedule(date)
     todos = Todo.load_todos
 
-    location_index = todos.index { |todo| todo.index == self.index }
-    todos[location_index].available_on = date
-    todos[location_index].category = 'upcoming'
+    original_todo_index = todos.map(&:index).index(self.index.to_s)
+
+    todos[original_todo_index].available_on = date
+    todos[original_todo_index].category = 'upcoming'
 
     Todo.save_todos(todos)
   end
@@ -313,8 +317,9 @@ class Todo
   def recur(days)
     todos = Todo.load_todos
 
-    location_index = todos.index { |todo| todo.index == self.index }
-    todos[location_index].recurrence_rule = days
+    original_todo_index = todos.map(&:index).index(self.index.to_s)
+
+    todos[original_todo_index].recurrence_rule = days
 
     Todo.save_todos(todos)
   end
