@@ -241,6 +241,10 @@ class Todo
 
     todos[original_todo_index] = self
 
+    if Display.marker && original_todo_index <= (Display.marker + 1)
+      Display.add_marker(Display.marker - 1)
+    end
+
     Todo.save_todos(todos)
   end
 
@@ -287,6 +291,8 @@ class Todo
     original_todo_index = todos.map(&:index).index(self.index.to_s)
     todos.delete_at(original_todo_index)
     todos.unshift(self)
+    self.category = 'today'
+    self.available_on = nil
 
     if Display.marker && (original_todo_index > Display.marker)
       Display.add_marker(Display.marker + 1)
@@ -304,12 +310,18 @@ class Todo
   end
 
   def schedule(date)
+    return self.prioritize if date == Date.today
+
     todos = Todo.load_todos
 
     original_todo_index = todos.map(&:index).index(self.index.to_s)
 
     todos[original_todo_index].available_on = date
     todos[original_todo_index].category = 'upcoming'
+
+    if Display.marker && original_todo_index <= (Display.marker + 1)
+      Display.add_marker(Display.marker - 1)
+    end
 
     Todo.save_todos(todos)
   end
@@ -332,6 +344,14 @@ class Todo
       todo.category = 'today'
       todo.prioritize
     end
+  end
+
+  def defer
+    self.schedule(Util.dow_to_date('mon'))
+  end
+
+  def long_defer
+    self.schedule(Date.today + 30)
   end
 end
 
@@ -406,8 +426,13 @@ class StartUpper
     'complete'     => 'complete',
     'l'            => 'list',
     'list'         => 'list',
-    'd'            => 'delete',
+    'x'            => 'delete',
     'delete'       => 'delete',
+    'd'            => 'defer',
+    'dw'           => 'defer',
+    'defer'        => 'defer',
+    'dm'           => 'long_defer',
+    'longdefer'    => 'long_defer',
     'p'            => 'prioritize',
     'prioritize'   => 'prioritize',
     '!'            => 'deprioritize',
@@ -582,46 +607,12 @@ class StartUpper
     single_todo_command(args) { |todo| todo.delete }
   end
 
-  def days_to_date(date_request)
-    return nil unless date_request =~ /^\d+\s*days?$/
-    days = date_request.split(/\s/).first.to_i
-    Date.today + days
+  def defer(args)
+    single_todo_command(args) { |todo| todo.defer }
   end
 
-  def dow_to_date(date_request)
-    dows = %w{sun mon tue wed thu fri sat}
-
-    request_day = date_request.split(/\s+/).last
-    request_dow = dows.index(request_day)
-
-    return nil unless request_dow
-
-    today_dow = Date.today.wday
-
-    date_gap = request_dow - today_dow
-    date_gap += 7 if date_gap <= 0
-    next_date = Date.today + date_gap
-
-    next_date += 7 if next_date <= Date.today
-
-    # Allow "next" or "n" to be used to push a date out a week
-    next_date += 7 if %w{next n}.include? date_request.split(/\s+/).first.downcase
-
-    next_date
-  end
-
-  def parse_date(date_request)
-    begin
-      return Date.parse(date_request)
-    rescue
-    end
-
-    nil
-  end
-
-  def specials_to_date(date_request)
-    return Date.today + 1 if date_request.downcase == 'tomorrow'
-    nil
+  def long_defer(args)
+    single_todo_command(args) { |todo| todo.long_defer }
   end
 
   def schedule(args)
@@ -634,15 +625,15 @@ class StartUpper
 
     return print_lookup_error(id) unless todo = Todo.find(id)
 
-    to_date = specials_to_date(date_request) || dow_to_date(date_request) || days_to_date(date_request) || parse_date(date_request)
+    to_date = Util.specials_to_date(date_request) || Util.dow_to_date(date_request) || Util.days_to_date(date_request) || Util.parse_date(date_request)
 
     unless to_date
-      Display.say("I couldn't understand your date '#{date_request}' (should be YYYY-MM-dd)")
+      Display.say("I couldn't understand your date '#{date_request}' (should be YYYY-MM-dd, or mon/tue/wed, etc.)")
       return
     end
 
-    unless to_date > Date.today
-      Display.say("Schedules Todos should happen in the future.  #{to_date} is not in the future.")
+    unless to_date >= Date.today
+      Display.say("Schedules Todos should not happen in the past.  #{to_date} is in the past.")
       return
     end
 
@@ -697,10 +688,6 @@ class StartUpper
     Display.say("I couldn't find a todo with an ID of #{id}")
   end
 
-  # TODO
-  def undo
-  end
-
   def info(*_args)
     stats = Todo.by_category.map { |category, todos| "#{todos.size} Todos in #{category}" }
     stats.unshift "FingerStrings v#{Config::VERSION}"
@@ -728,7 +715,9 @@ class StartUpper
       '{wu r}ecur <id> <amount>        - Set a recurrence rule for a Todo',
       '{wu m}ark <id>                  - Add a marker below the specified todo (impermanent)',
       'untag <id>                      - Remove all Tags from a Todo',
-      '{wu d}elete                     - Delete a Todo entirely',
+      'delete <id>, x <id>             - Delete a Todo entirely',
+      '{wu d}efer <id>, dw <id>        - Defer a Todo to the following Monday',
+      'longdefer <id>, dm <id>         - Defer a Todo for 30 days',
       '{wu i}nfo                       - Display FingerStrings version and stats',
       '{wu h}elp, ?                    - Display this text',
       'clear                           - Clear screen',
@@ -789,6 +778,51 @@ class StartUpper
     while line = readline("~> ") do
       handle(line)
     end
+  end
+end
+
+class Util
+  def self.days_to_date(date_request)
+    return nil unless date_request =~ /^\d+\s*days?$/
+    days = date_request.split(/\s/).first.to_i
+    Date.today + days
+  end
+
+  def self.parse_date(date_request)
+    begin
+      return Date.parse(date_request)
+    rescue
+    end
+
+    nil
+  end
+
+  def self.specials_to_date(date_request)
+    return Date.today + 1 if date_request.downcase == 'tomorrow'
+    return Date.today if date_request.downcase == 'today'
+    nil
+  end
+
+  def self.dow_to_date(date_request)
+    dows = %w{sun mon tue wed thu fri sat}
+
+    request_day = date_request.split(/\s+/).last
+    request_dow = dows.index(request_day)
+
+    return nil unless request_dow
+
+    today_dow = Date.today.wday
+
+    date_gap = request_dow - today_dow
+    date_gap += 7 if date_gap <= 0
+    next_date = Date.today + date_gap
+
+    next_date += 7 if next_date <= Date.today
+
+    # Allow "next" or "n" to be used to push a date out a week
+    next_date += 7 if %w{next n}.include? date_request.split(/\s+/).first.downcase
+
+    next_date
   end
 end
 

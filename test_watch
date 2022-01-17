@@ -1,0 +1,21 @@
+#!/usr/bin/env bash
+
+echo "Watching..."
+
+if [[ "$OSTYPE" == "linux-gnu" ]]; then
+  # sudo apt install inotify-tools
+  while inotifywait -r -e modify .; do
+    # SKIP_PRECOMPILE=TRUE SKIP_LINT=TRUE ./test.sh $1
+    clear
+    ruby ./tests/finger_strings_test.rb
+  done
+fi
+
+if [[ "$OSTYPE" == "darwin18.0" ]]; then
+  # brew install entr
+  find . -name "*.rb" | entr sh -c 'clear; ruby iris_test.rb'
+fi
+
+# while inotifywait -r -e modify ./spec; do
+  # SKIP_PRECOMPILE=TRUE SKIP_LINT=TRUE ./test.sh $1
+  # done
