@@ -8,7 +8,6 @@ require 'date'
 # require 'pry-nav'; binding.pry
 
 class Config
-
   @@todo_file = $test_todo_file || "#{ENV['HOME']}/.finger_strings"
 
   VERSION              = '0.0.3'
@@ -163,6 +162,10 @@ class Todo
     self.load_todos.select { |todo| todo.category == 'done' }.sort { |left, right| right.completed_at <=> left.completed_at }
   end
 
+  def self.backlog
+    self.load_todos.select { |todo| todo.category == 'backlog' }
+  end
+
   def self.not_done
     self.load_todos.select { |todo| todo.category != 'done' }
   end
@@ -197,7 +200,7 @@ class Todo
     todos = {
       'today' => [],
       'upcoming' => [],
-      'someday' => [],
+      'backlog' => [],
       'recurring' => [],
       'done' => []
     }
@@ -271,6 +274,22 @@ class Todo
     todos.push(self)
 
     if Display.marker && original_todo_index <= (Display.marker + 1)
+      Display.add_marker(Display.marker - 1)
+    end
+
+    Todo.save_todos(todos)
+  end
+
+  def backlog
+    todos = Todo.load_todos
+
+    original_todo_index = todos.map(&:index).index(self.index.to_s)
+    todos.delete_at(original_todo_index)
+    todos.unshift(self)
+    self.category = 'backlog'
+    self.available_on = nil
+
+    if Display.marker && (original_todo_index <= Display.marker)
       Display.add_marker(Display.marker - 1)
     end
 
@@ -422,6 +441,8 @@ class StartUpper
   CMD_MAP = {
     'a'            => 'add',
     'add'          => 'add',
+    'b'            => 'backlog',
+    'backlog'      => 'backlog',
     'c'            => 'complete',
     'complete'     => 'complete',
     'l'            => 'list',
@@ -461,7 +482,7 @@ class StartUpper
   CATEGORY_COLORS = {
     'today' => '{wi ',
     'upcoming' => '{w ',
-    'someday' => '{w ',
+    'backlog' => '{r ',
     'recurring' => '{w ',
     'done' => '{wv '
   }
@@ -494,6 +515,11 @@ class StartUpper
   def self.show_done
     Display.clear
     show('done', Todo.done)
+  end
+
+  def self.show_backlog
+    Display.clear
+    show('backlog', Todo.backlog)
   end
 
   def show_upcoming
@@ -533,7 +559,7 @@ class StartUpper
     else
       todos.each_with_index do |todo, raw_idx|
         Display.line_say(todo.to_string)
-        Display.mark if Display.marker == raw_idx
+        Display.mark if Display.marker == raw_idx if category == 'today'
       end
     end
   end
@@ -560,6 +586,7 @@ class StartUpper
     return show_upcoming if args        == ['upcoming']  || args == ['u']
     return show_recurring if args       == ['recurring'] || args == ['r']
     return show_tags if args            == ['tags']      || args == ['t']
+    return StartUpper.show_backlog if args         == ['backlog']   || args == ['b']
     StartUpper.show_today
   end
 
@@ -585,6 +612,10 @@ class StartUpper
 
   def complete(*args)
     single_todo_command(args) { |todo| todo.mark_done }
+  end
+
+  def backlog(*args)
+    single_todo_command(args) { |todo| todo.backlog }
   end
 
   def deprioritize(*args)
